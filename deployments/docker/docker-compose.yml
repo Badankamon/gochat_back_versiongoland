@@ -1,0 +1,54 @@
+version: '3.8'
+
+# Conteneurs à lancer : PostgreSQL + Redis
+services:
+  # Base de données PostgreSQL
+  postgres:
+    image: postgres:16-alpine # Image légère et stable pour dev
+    container_name: gochat-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}       # Ton user : postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password} # Ton mdp : password
+      POSTGRES_DB: ${DB_NAME:-gochat}           # Ton nom de DB : gochat
+    ports:
+      - "${DB_PORT:-5432}:5432" # Mapping port : ton port 5432 → conteneur 5432
+    volumes:
+      - postgres_gochat_data:/var/lib/postgresql/data # Persistance données (IMPORTANT)
+    networks:
+      - gochat-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d gochat"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Serveur Redis (cache/sessions)
+  redis:
+    image: redis:7-alpine # Image légère Redis
+    container_name: gochat-redis
+    restart: always
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-} # Aucun mot de passe (comme demandé)
+    ports:
+      - "${REDIS_PORT:-6379}:6379" # Mapping port : ton 6379 → conteneur 6379
+    volumes:
+      - redis_gochat_data:/data # Persistance données Redis
+    networks:
+      - gochat-network
+    command: redis-server --appendonly yes # Active la persistance des données
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+# Réseau privé pour les conteneurs (ils communiquent entre eux)
+networks:
+  gochat-network:
+    driver: bridge
+
+# Volumes pour la persistance (données conservées après arrêt des conteneurs)
+volumes:
+  postgres_gochat_data:
+  redis_gochat_data:
